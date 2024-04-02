@@ -32,6 +32,22 @@ forecast_var = [var1, var2, var3, var4, var5, var6]
 print(f'Forecasting variable(s): {forecast_var}')
 
 ###############################################################################################################################
+'Getting weather forecast data from OpenWeather'
+print('####################################Weather Forecast Data######################################')
+import API_OpenMeteo
+###############################################################################################################################
+print('######################################Forecasting Info#########################################')
+# Time horizon of the forecast (hours). It is defined in 'API_OpenMeteo.py'
+horizon_forecast = API_OpenMeteo.next_hours
+print(f'Time horizon of the forecast: {horizon_forecast} hours')
+
+# Start and end of the forecast timestamps. Comes from 'API_OpenMeteo.py'
+start_forecast = API_OpenMeteo.weather_forecast_15min.index[0]
+end_forecast = API_OpenMeteo.weather_forecast_15min.index[-1]
+
+print(f'Period to forecast: {start_forecast} to {end_forecast}')
+
+###############################################################################################################################
 'Getting historical weather data from the database'
 print('###################################Historical Weather Data#####################################')
 ###############################################################################################################################
@@ -53,13 +69,13 @@ try:
     if connection.is_connected():
         print("Connected to the database")
 
-    # SQL query to retrieve the historical data from 'Weather' table
-    query = "SELECT * FROM Weather"
+    # SQL query to retrieve the historical data from 'Demo_Weather' table
+    query = f"SELECT * FROM Demo_Weather WHERE Date < '{start_forecast}'"
 
     # Creating a dataframe with the historical data 
     historical_weather = pd.read_sql(query, connection)
     historical_weather.set_index('Date', inplace= True)
-    print("Historical weather data successfully loaded from the database")
+    print("Historical weather data successfully loaded from Demo_Weather database")
 
 except mysql.connector.Error as error:
     print(f"Error: {error}")
@@ -68,22 +84,6 @@ finally:
     if connection.is_connected():
         connection.close()
         print("Database connection closed")
-
-###############################################################################################################################
-'Getting weather forecast data from OpenWeather'
-print('####################################Weather Forecast Data######################################')
-import API_OpenWeather
-###############################################################################################################################
-print('######################################Forecasting Info#########################################')
-# Time horizon of the forecast (hours). It is defined in 'API_Openweather.py'
-horizon_forecast = API_OpenWeather.next_hours
-print(f'Time horizon of the forecast: {horizon_forecast} hours')
-
-# Start and end of the forecast timestamps. Comes from 'API_Openweather.py'
-start_forecast = API_OpenWeather.df_forecast_15min.index[0]
-end_forecast = API_OpenWeather.df_forecast_15min.index[-1]
-
-print(f'Period to forecast: {start_forecast} to {end_forecast}')
 
 ###############################################################################################################################
 'Forecast of EV connection and req (var1 and var2)'
@@ -116,12 +116,12 @@ if var1 and var2 in forecast_var:
             print("Connected to the database")
     
         # SQL query to retrieve the data from the 'EV_house' table
-        query = f"SELECT * FROM ist1100758.EV_house WHERE Date < '{end_forecast}'"
+        query = f"SELECT * FROM ist1100758.EV_house WHERE Date < '{start_forecast}'"
 
         # Creating a dataframe with the data 
         EV_data = pd.read_sql(query, connection)
         EV_data.set_index('Date', inplace= True)
-        print("EV data successfully loaded from the database")
+        print("EV data successfully loaded from EV_house database")
 
     except mysql.connector.Error as error:
         print(f"Error: {error}")
@@ -133,7 +133,7 @@ if var1 and var2 in forecast_var:
 
     # Creating train and test dataframes
     df_train_EV = pd.merge(EV_data, historical_weather, left_index=True, right_index=True)
-    df_test_EV = API_OpenWeather.df_forecast_15min
+    df_test_EV = API_OpenMeteo.weather_forecast_15min
     
     # Creating final dataframe (training + forecast)
     df_final_EV = df_train_EV.append(df_test_EV)
@@ -172,7 +172,7 @@ if var3 in forecast_var:
         # Creating a dataframe with the historical house power consumption data 
         historical_cons = pd.read_sql(query, connection)
         historical_cons.set_index('Date', inplace= True)
-        print("Power consumption data successfully loaded from the database")
+        print("Power consumption data successfully loaded from Power_cons database")
     
     except mysql.connector.Error as error:
         print(f"Error: {error}")
@@ -184,7 +184,7 @@ if var3 in forecast_var:
     
     # Creating train and test dataframes
     df_train_cons = pd.merge(historical_cons, historical_weather, left_index=True, right_index=True)
-    df_test_cons = API_OpenWeather.df_forecast_15min
+    df_test_cons = API_OpenMeteo.weather_forecast_15min
     
     # Creating final dataframe (training + forecast)
     df_final_cons = df_train_cons.append(df_test_cons)
@@ -218,12 +218,12 @@ if var4 in forecast_var:
             print("Connected to the database")
     
         # SQL query to retrieve the data from the 'PV_gen' table
-        query = f"SELECT * FROM ist1100758.PV_gen WHERE Date < '{end_forecast}'"
+        query = f"SELECT * FROM ist1100758.PV_gen WHERE Date < '{start_forecast}'"
 
         # Creating a dataframe with the data 
         historical_PV = pd.read_sql(query, connection)
         historical_PV.set_index('Date', inplace= True)
-        print("PV power generation data successfully loaded from the database")
+        print("PV power generation data successfully loaded from PV_gen database")
 
     except mysql.connector.Error as error:
         print(f"Error: {error}")
@@ -235,7 +235,7 @@ if var4 in forecast_var:
     
     # Creating train and test dataframes
     df_train_PV = pd.merge(historical_PV, historical_weather, left_index=True, right_index=True)
-    df_test_PV = API_OpenWeather.df_forecast_15min
+    df_test_PV = API_OpenMeteo.weather_forecast_15min
     
     # Creating final dataframe (training + forecast)
     df_final_PV = df_train_PV.append(df_test_PV)
@@ -269,12 +269,12 @@ if var5 in forecast_var:
             print("Connected to the database")
     
         # SQL query to retrieve the data from the 'Services' table
-        query = f"SELECT Date, congestion FROM ist1100758.Services WHERE Date < '{end_forecast}'"
+        query = f"SELECT Date, congestion FROM ist1100758.Services WHERE Date < '{start_forecast}'"
 
         # Creating a dataframe with the data 
         historical_congestion = pd.read_sql(query, connection)
         historical_congestion.set_index('Date', inplace= True)
-        print("Congestion data successfully loaded from the database")
+        print("Congestion data successfully loaded from Services database")
 
     except mysql.connector.Error as error:
         print(f"Error: {error}")
@@ -286,7 +286,7 @@ if var5 in forecast_var:
     
     # Creating train and test dataframes
     df_train_congestion = pd.merge(historical_congestion, historical_weather, left_index=True, right_index=True)
-    df_test_congestion = API_OpenWeather.df_forecast_15min
+    df_test_congestion = API_OpenMeteo.weather_forecast_15min
     
     # Creating final dataframe (training + forecast)
     df_final_congestion = df_train_congestion.append(df_test_congestion)
@@ -320,12 +320,12 @@ if var6 in forecast_var:
             print("Connected to the database")
     
         # SQL query to retrieve the data from the 'Services' table
-        query = f"SELECT Date, wind_curtailment FROM ist1100758.Services WHERE Date < '{end_forecast}'"
+        query = f"SELECT Date, wind_curtailment FROM ist1100758.Services WHERE Date < '{start_forecast}'"
 
         # Creating a dataframe with the data 
         historical_curtailment = pd.read_sql(query, connection)
         historical_curtailment.set_index('Date', inplace= True)
-        print("Wind curtailment data successfully loaded from the database")
+        print("Wind curtailment data successfully loaded from Services database")
 
     except mysql.connector.Error as error:
         print(f"Error: {error}")
@@ -337,7 +337,7 @@ if var6 in forecast_var:
     
     # Creating train and test dataframes
     df_train_curtailment = pd.merge(historical_curtailment, historical_weather, left_index=True, right_index=True)
-    df_test_curtailment = API_OpenWeather.df_forecast_15min
+    df_test_curtailment = API_OpenMeteo.weather_forecast_15min
     
     # Creating final dataframe (training + forecast)
     df_final_curtailment = df_train_curtailment.append(df_test_curtailment)
@@ -438,7 +438,7 @@ if var1 and var2 and var3 and var4 and var5 and var6 in forecast_var:
             cursor.execute(insert_data_query, data)
             connection.commit()
         
-        print(f'Forecasts of {forecast_var} for next {API_OpenWeather.next_hours} hours inserted successfully into the database')
+        print(f'Forecasts of {forecast_var} for next {horizon_forecast} hours inserted successfully into Demo_Forecast database')
     
     except mysql.connector.Error as error:
         print(f"Error: {error}")

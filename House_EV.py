@@ -269,17 +269,16 @@ def forecasting(data, variables, start_forecast):
             first_zero = False
             count += 1
             energy_cum += pred_EV[variables[1]][i]
+            pred_EV[variables[1]][i] = 0
         # Checking if the 'Connection' is 0, if it is, assign the energy_cum to the last row
         if value == 0 and first_zero is False:
             first_zero = True
-            pred_EV.loc[i-count:i-1, variables[1]] = 0
             pred_EV[variables[1]][i-1] = energy_cum
             count = 0
             energy_cum = 0
         # For the end of the dataset   
         if i == len(pred_EV)-1 and value == 1:
             first_zero = True
-            pred_EV.loc[i-count:i, variables[1]] = 0
             pred_EV[variables[1]][i] = energy_cum
             count = 0
             energy_cum = 0

@@ -11,6 +11,8 @@ import numpy as np
 import pandas as pd
 import xgboost as xgb
 from datetime import timedelta
+from astral import LocationInfo
+from astral.sun import sun
 
 ###############################################################################################################################
 'Functions'
@@ -98,6 +100,30 @@ def cyclical_features(df):
     
     return df
 
+'Function pv_postprocessing'
+"""
+Removes PV generation for timestamps before sunrise and after sunset
+    
+Args:
+    df - dataframe with the pv forecasts
+        
+Returns:
+    df - dataframe with the pv forecasts after post-processing
+"""
+
+def pv_postprocessing(df, lat, lon):
+    lat = lat
+    long =lon
+    
+    loc = LocationInfo(latitude= lat, longitude= long)
+    day = df.index[0].date()
+    s = sun(loc.observer, date= day)
+    
+    for col in df.columns:
+        df[col] = np.where((df.index.time < s["sunrise"].time()) | (df.index.time > s["sunset"].time()) , 0, df[col])
+
+    return df
+
 ###############################################################################################################################
 '#########################################House PV Power Generation Forecasting###############################################'
 ###############################################################################################################################
@@ -113,7 +139,7 @@ Returns:
     pred_PVgen - dataframe containing the PV power generation predictions 
 """
 
-def forecasting(data, var, start_forecast):
+def forecasting(data, var, start_forecast, lat, lon):
     print('Forecast variable: ', var)
     
     # Creating a copy of the input dataframe
@@ -191,9 +217,9 @@ def forecasting(data, var, start_forecast):
     reg_XGBOOST.fit(xtrain, np.ravel(ytrain))
     
     # Predictions and post-processing
-    pred_PVgen= pd.DataFrame(reg_XGBOOST.predict(xtest), columns= [var], index= xtest.index)
+    pred_PVgen = pd.DataFrame(reg_XGBOOST.predict(xtest), columns= [var], index= xtest.index)
     pred_PVgen[var]= np.where(pred_PVgen[var] < 0, 0, pred_PVgen[var])
-    pred_PVgen[var] = np.where((pred_PVgen.index.hour <5) | (pred_PVgen.index.hour >19), 0, pred_PVgen[var])
+    pred_PVgen = pv_postprocessing(pred_PVgen, lat, lon)
     
     print(f'Output: {var} predictions successfully generated!')
     

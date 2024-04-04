@@ -19,6 +19,8 @@ import warnings
 from datetime import datetime
 from datetime import timedelta
 from matplotlib.dates import DateFormatter
+from astral import LocationInfo
+from astral.sun import sun
 import mysql.connector
 
 import API_OpenMeteo
@@ -114,13 +116,47 @@ def cyclical_features(df):
     
     return df
 
+'Function pv_postprocessing'
+"""
+Removes PV generation for timestamps before sunrise and after sunset
+    
+Args:
+    df - dataframe with the pv forecasts
+        
+Returns:
+    df - dataframe with the pv forecasts after post-processing
+"""
+
+def pv_postprocessing(df, lat, lon):
+    lat = lat
+    long =lon
+    
+    loc = LocationInfo(latitude= lat, longitude= long)
+    day = df.index[0].date()
+    s = sun(loc.observer, date= day)
+    
+    for col in df.columns:
+        df[col] = np.where((df.index.time < s["sunrise"].time()) | (df.index.time > s["sunset"].time()) , 0, df[col])
+
+    return df
+
 
 '##############################################PV Power Generation Forecast####################################################'
+
+# Define the time horizon of the forecast (in hours)
+horizon_forecast = 36
+
+# Define the number of days of historical weather data to get (before the start of the forecast)
+days_past_weather = 7
+
+# Define the latitude and longitude of the location
+lat = 37.7412
+lon = -25.6756
 
 ###############################################################################################################################
 'Getting the weather forecasts for next_hours from OpenWeather API'
 ###############################################################################################################################
-df_forecast = API_OpenMeteo.weather_forecast_15min
+df_forecast = API_OpenMeteo.get_weather_data(lat, lon, horizon_forecast, days_past_weather)
 start_forecast = df_forecast.index[0]
 end_forecast = df_forecast.index[-1]
 
@@ -218,7 +254,7 @@ df_final = df_train.append(df_test)
 df_final = create_features(df_final)
 
 # Creating lag features of power consumption for 2,3,4 and 5 days before
-df_final = lag_features(df_final,[2,3,4,5], var)
+# df_final = lag_features(df_final,[2,3,4,5], var)
 df_final.dropna(inplace=True, subset= df_final.columns[1:])
 
 error = df_final[(df_final.Hour < 5) & (df_final[var] != 0)]
@@ -319,8 +355,8 @@ reg_XGBOOST.fit(xtrain, np.ravel(ytrain))
 # Predictions and post-processing
 df_XGBOOST = pd.DataFrame(reg_XGBOOST.predict(xtest), columns= ['Prediction'], index= xtest.index)
 df_XGBOOST['Prediction']= np.where(df_XGBOOST['Prediction']< 0, 0 , df_XGBOOST['Prediction'])
+df_XGBOOST = pv_postprocessing(df_XGBOOST, lat, lon)
 df_XGBOOST['Real'] = ytest
-df_XGBOOST['Prediction'] = np.where((df_XGBOOST.index.hour <5) | (df_XGBOOST.index.hour >19) , 0, df_XGBOOST['Prediction'])
 
 #Regression Plot
 sns.scatterplot(data= df_XGBOOST, x='Real', y= 'Prediction')

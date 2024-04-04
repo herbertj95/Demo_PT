@@ -19,6 +19,8 @@ from datetime import timedelta
 from matplotlib.dates import DateFormatter
 import mysql.connector
 
+import API_OpenMeteo
+
 ###############################################################################################################################
 'Plot Parameters'
 ###############################################################################################################################
@@ -113,12 +115,22 @@ def cyclical_features(df):
 
 '############################################House Congestion Service Forecast################################################'
 
+# Define the time horizon of the forecast (in hours)
+horizon_forecast = 36
+
+# Define the number of days of historical weather data to get (before the start of the forecast)
+days_past_weather = 7
+
+# Define the latitude and longitude of the location
+lat = 38.954341
+lon = -8.9873593
+
 ###############################################################################################################################
-'Inputs'
+'Getting the weather forecasts for next_hours from OpenWeather API'
 ###############################################################################################################################
-start_forecast = datetime.strptime('2024-04-01', '%Y-%m-%d')
-end_forecast = datetime.strptime('2024-04-02', '%Y-%m-%d')
-var = 'congestion'
+df_forecast = API_OpenMeteo.get_weather_data(lat, lon, horizon_forecast, days_past_weather)
+start_forecast = df_forecast.index[0]
+end_forecast = df_forecast.index[-1]
 
 ###############################################################################################################################
 'Getting power data from the database'
@@ -143,7 +155,7 @@ try:
         print("Connected to the database")
 
     # SQL query to retrieve the data from the 'Weather' table
-    query = "SELECT Date, congestion FROM ist1100758.Services"
+    query = f"SELECT Date, congestion FROM ist1100758.Services WHERE Date < '{end_forecast}'"
 
     # Creating a dataframe with the data 
     congestion = pd.read_sql(query, connection)
@@ -181,7 +193,7 @@ try:
         print("Connected to the database")
 
     # SQL query to retrieve the data from the 'Weather' table
-    query = "SELECT * FROM Demo_Weather"
+    query = f"SELECT * FROM Demo_Weather WHERE Date < '{start_forecast}'"
 
     # Creating a dataframe with the data 
     historical_weather = pd.read_sql(query, connection)
@@ -200,8 +212,15 @@ finally:
 'Creating final dataframe'
 print('##########################################Forecasting##########################################')
 ###############################################################################################################################
+# Name of congestion service variable
+var = 'congestion'
+
 # Merging congestion data with weather data
-df_final = pd.merge(congestion, historical_weather, left_index=True, right_index=True)
+df_train = pd.merge(congestion, historical_weather, left_index=True, right_index=True)
+df_test = pd.merge(congestion, df_forecast, left_index=True, right_index=True)
+
+# Creating final dataframe (training + forecast)
+df_final = df_train.append(df_test)
 
 # Creating date/time features using datetime column Date as index
 df_final = create_features(df_final)
@@ -258,9 +277,10 @@ importance.set_index('Feature', inplace=True)
 # Defining the number of features to use
 num_features = 10    # Optimal number of features is 10
 
-# Defining training and test dataframes
-data_train = df_final.loc[: start_forecast - timedelta(minutes= 15)]
-data_test = df_final.loc[start_forecast : end_forecast]
+# Defining training and test periods
+data_train = df_final.loc[: df_train.index[-1]]
+data_test = df_final.loc[df_forecast.index[0] :]
+
 
 # Plot train-test
 fig,ax = plt.subplots()
@@ -330,5 +350,6 @@ print('Root Mean Square Error (RMSE):',  round(RMSE,2))
 print('Normalized RMSE (%):', round(normRMSE,2))
 print('R square (%):', round(R2,2))
 
-'Converting predictions into 0 and 1'
-pred_congestion[var]= np.where(pred_congestion['Prediction'] > 0.3, 1, 0)
+'Converting predictions into 0 and 1 for consumption and generation'
+pred_congestion['congestion_consumption'] = np.where(pred_congestion['Prediction'] > 0.3, 1, 0)
+pred_congestion['congestion_generation'] = np.where((pred_congestion.index.hour > 12) & (pred_congestion.index.hour < 20) & (pred_congestion['Prediction'] < 0.175), 1, 0)

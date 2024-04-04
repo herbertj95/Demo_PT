@@ -31,19 +31,36 @@ var6 = 'wind_curtailment'
 forecast_var = [var1, var2, var3, var4, var5, var6]
 print(f'Forecasting variable(s): {forecast_var}')
 
-###############################################################################################################################
-'Getting weather forecast data from OpenWeather'
-print('####################################Weather Forecast Data######################################')
-import API_OpenMeteo
-###############################################################################################################################
-print('######################################Forecasting Info#########################################')
-# Time horizon of the forecast (hours). It is defined in 'API_OpenMeteo.py'
-horizon_forecast = API_OpenMeteo.next_hours
+# Define the time horizon of the forecast (in hours)
+horizon_forecast = 36
 print(f'Time horizon of the forecast: {horizon_forecast} hours')
 
-# Start and end of the forecast timestamps. Comes from 'API_OpenMeteo.py'
-start_forecast = API_OpenMeteo.weather_forecast_15min.index[0]
-end_forecast = API_OpenMeteo.weather_forecast_15min.index[-1]
+# Define the number of days of historical weather data to get (before the start of the forecast)
+days_past_weather = 7
+
+# Define the latitude and longitude of the location 
+# Ponta Delgada in Sao Miguel, Acores (37.7412, -25.6756)
+# Professor Hugo house in Lisbon (38.954341,-8.9873593)
+lat = 38.954341
+lon = -8.9873593
+print(f'Latitude and longitude of the location: {lat}, {lon}')
+
+# Define the power charger (in W)
+power_charger = 11000
+
+###############################################################################################################################
+'Getting historical and forecast weather data from OpenMeteo'
+print('########################################Weather Data###########################################')
+import API_OpenMeteo
+
+df_weather_forecast = API_OpenMeteo.get_weather_data(lat, lon, horizon_forecast, days_past_weather)
+
+###############################################################################################################################
+print('######################################Forecasting Info#########################################')
+
+# Start and end of the forecast timestamps. Comes from df_weather_forecast dataframe
+start_forecast = df_weather_forecast.index[0]
+end_forecast = df_weather_forecast.index[-1]
 
 print(f'Period to forecast: {start_forecast} to {end_forecast}')
 
@@ -133,7 +150,7 @@ if var1 and var2 in forecast_var:
 
     # Creating train and test dataframes
     df_train_EV = pd.merge(EV_data, historical_weather, left_index=True, right_index=True)
-    df_test_EV = API_OpenMeteo.weather_forecast_15min
+    df_test_EV = df_weather_forecast
     
     # Creating final dataframe (training + forecast)
     df_final_EV = df_train_EV.append(df_test_EV)
@@ -184,7 +201,7 @@ if var3 in forecast_var:
     
     # Creating train and test dataframes
     df_train_cons = pd.merge(historical_cons, historical_weather, left_index=True, right_index=True)
-    df_test_cons = API_OpenMeteo.weather_forecast_15min
+    df_test_cons = df_weather_forecast
     
     # Creating final dataframe (training + forecast)
     df_final_cons = df_train_cons.append(df_test_cons)
@@ -235,13 +252,13 @@ if var4 in forecast_var:
     
     # Creating train and test dataframes
     df_train_PV = pd.merge(historical_PV, historical_weather, left_index=True, right_index=True)
-    df_test_PV = API_OpenMeteo.weather_forecast_15min
+    df_test_PV = df_weather_forecast
     
     # Creating final dataframe (training + forecast)
     df_final_PV = df_train_PV.append(df_test_PV)
     
     # Running the forecasting in 'House_Power_cons.py'
-    forecast_PV_gen = House_PV_gen.forecasting(df_final_PV, var4, start_forecast)
+    forecast_PV_gen = House_PV_gen.forecasting(df_final_PV, var4, start_forecast, lat, lon)
     
 ###############################################################################################################################
 'Forecast of congestion service (var5)'
@@ -286,7 +303,7 @@ if var5 in forecast_var:
     
     # Creating train and test dataframes
     df_train_congestion = pd.merge(historical_congestion, historical_weather, left_index=True, right_index=True)
-    df_test_congestion = API_OpenMeteo.weather_forecast_15min
+    df_test_congestion = df_weather_forecast
     
     # Creating final dataframe (training + forecast)
     df_final_congestion = df_train_congestion.append(df_test_congestion)
@@ -337,13 +354,13 @@ if var6 in forecast_var:
     
     # Creating train and test dataframes
     df_train_curtailment = pd.merge(historical_curtailment, historical_weather, left_index=True, right_index=True)
-    df_test_curtailment = API_OpenMeteo.weather_forecast_15min
+    df_test_curtailment = df_weather_forecast
     
     # Creating final dataframe (training + forecast)
     df_final_curtailment = df_train_curtailment.append(df_test_curtailment)
     
     # Running the forecasting in 'House_Wind_curtailment.py'
-    forecast_curtailment = House_Wind_curtailment.forecasting(df_final_curtailment, var6, start_forecast)
+    forecast_curtailment = House_Wind_curtailment.forecasting(df_final_curtailment, var6, start_forecast, power_charger)
     
 ###############################################################################################################################
 'Forecasting Results'
@@ -406,7 +423,8 @@ if var1 and var2 and var3 and var4 and var5 and var6 in forecast_var:
             {var2} FLOAT,
             {var3} FLOAT,
             {var4} FLOAT,
-            {var5} FLOAT,
+            {var5}_consumption FLOAT,
+            {var5}_generation FLOAT,
             {var6} FLOAT
         )
         """
@@ -424,17 +442,18 @@ if var1 and var2 and var3 and var4 and var5 and var6 in forecast_var:
         # Iterate over the dataframe and insert data into the 'Forecast' table
         for index, row in df_forecast.iterrows():
             insert_data_query = f"""
-            INSERT INTO Demo_Forecast (Date, {var1}, {var2}, {var3}, {var4}, {var5}, {var6})
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO Demo_Forecast (Date, {var1}, {var2}, {var3}, {var4}, {var5}_consumption, {var5}_generation, {var6})
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE
                 {var1} = VALUES({var1}),
                 {var2} = VALUES({var2}),
                 {var3} = VALUES({var3}),
                 {var4} = VALUES({var4}),
-                {var5} = VALUES({var5}),
+                {var5}_consumption = VALUES({var5}_consumption),
+                {var5}_generation = VALUES({var5}_generation),
                 {var6} = VALUES({var6})
             """
-            data = (index, float(row[var1]), float(row[var2]), float(row[var3]), float(row[var4]), float(row[var5]), float(row[var6]))
+            data = (index, float(row[var1]), float(row[var2]), float(row[var3]), float(row[var4]), float(row[f'{var5}_consumption']), float(row[f'{var5}_generation']), float(row[var6]))
             cursor.execute(insert_data_query, data)
             connection.commit()
         

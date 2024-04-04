@@ -114,7 +114,7 @@ Returns:
     pred_curtailment - dataframe containing the wind curtailment service predictions 
 """
 
-def forecasting(data, var, start_forecast):
+def forecasting(data, var, start_forecast, power_charger):
     print('Forecast variable: ', var)
     
     # Creating a copy of the input dataframe
@@ -179,7 +179,7 @@ def forecasting(data, var, start_forecast):
     # Predictions and post-processing
     vehicles= 500
     pred_curtailment = pd.DataFrame(reg_RF.predict(xtest), columns= [var], index= xtest.index)
-    pred_curtailment[var] = np.where(pred_curtailment[var] > (0.5 * vehicles * 0.0037), 1, 0)
+    pred_curtailment[var] = np.where(pred_curtailment[var] > (0.5 * vehicles * power_charger), 1, 0)
     pred_curtailment[var] = np.where((pred_curtailment.index.hour > 6) | (pred_curtailment.index.hour < 0), 0, pred_curtailment[var])
 
     print(f'Output: {var} predictions successfully generated!')

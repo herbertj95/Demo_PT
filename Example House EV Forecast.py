@@ -160,10 +160,20 @@ def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix'
 
 '##########################################House EV Connection and Req Forecast###############################################'
 
+# Define the time horizon of the forecast (in hours)
+horizon_forecast = 36
+
+# Define the number of days of historical weather data to get (before the start of the forecast)
+days_past_weather = 7
+
+# Define the latitude and longitude of the location
+lat = 38.954341
+lon = -8.9873593
+
 ###############################################################################################################################
 'Getting the weather forecasts for next_hours from OpenWeather API'
 ###############################################################################################################################
-df_forecast = API_OpenMeteo.weather_forecast_15min
+df_forecast = API_OpenMeteo.get_weather_data(lat, lon, horizon_forecast, days_past_weather)
 start_forecast = df_forecast.index[0]
 end_forecast = df_forecast.index[-1]
 

@@ -19,6 +19,8 @@ from datetime import timedelta
 from matplotlib.dates import DateFormatter
 import mysql.connector
 
+import API_OpenMeteo
+
 ###############################################################################################################################
 'Plot Parameters'
 ###############################################################################################################################
@@ -113,12 +115,22 @@ def cyclical_features(df):
 
 '########################################House Wind Curtailment Service Forecast##############################################'
 
+# Define the time horizon of the forecast (in hours)
+horizon_forecast = 36
+
+# Define the number of days of historical weather data to get (before the start of the forecast)
+days_past_weather = 7
+
+# Define the latitude and longitude of the location
+lat = 38.954341
+lon = -8.9873593
+
 ###############################################################################################################################
-'Inputs'
+'Getting the weather forecasts for next_hours from OpenWeather API'
 ###############################################################################################################################
-start_forecast = datetime.strptime('2024-04-01', '%Y-%m-%d')
-end_forecast = datetime.strptime('2024-04-02', '%Y-%m-%d')
-var = 'wind_curtailment'
+df_forecast = API_OpenMeteo.get_weather_data(lat, lon, horizon_forecast, days_past_weather)
+start_forecast = df_forecast.index[0]
+end_forecast = df_forecast.index[-1]
 
 ###############################################################################################################################
 'Getting power data from the database'
@@ -143,7 +155,7 @@ try:
         print("Connected to the database")
 
     # SQL query to retrieve the data from the 'Weather' table
-    query = "SELECT Date, wind_curtailment FROM ist1100758.Services"
+    query = f"SELECT Date, wind_curtailment FROM ist1100758.Services WHERE Date < '{end_forecast}'"
 
     # Creating a dataframe with the data 
     wind_curt = pd.read_sql(query, connection)
@@ -181,7 +193,7 @@ try:
         print("Connected to the database")
 
     # SQL query to retrieve the data from the 'Weather' table
-    query = "SELECT * FROM Demo_Weather"
+    query = f"SELECT * FROM Demo_Weather WHERE Date < '{start_forecast}'"
 
     # Creating a dataframe with the data 
     historical_weather = pd.read_sql(query, connection)
@@ -200,8 +212,16 @@ finally:
 'Creating final dataframe'
 print('##########################################Forecasting##########################################')
 ###############################################################################################################################
+
+# Name of congestion service variable
+var = 'wind_curtailment'
+
 # Merging congestion data with weather data
-df_final = pd.merge(wind_curt, historical_weather, left_index=True, right_index=True)
+df_train = pd.merge(wind_curt, historical_weather, left_index=True, right_index=True)
+df_test = pd.merge(wind_curt, df_forecast, left_index=True, right_index=True)
+
+# Creating final dataframe (training + forecast)
+df_final = df_train.append(df_test)
 
 # Creating date/time features using datetime column Date as index
 df_final = create_features(df_final)
@@ -258,9 +278,9 @@ importance.set_index('Feature', inplace=True)
 # Defining the number of features to use
 num_features = 20    # Optimal number of features is 20
 
-# Defining training and test dataframes
-data_train = df_final.loc[: start_forecast - timedelta(minutes= 15)]
-data_test = df_final.loc[start_forecast : end_forecast]
+# Defining training and test periods
+data_train = df_final.loc[: df_train.index[-1]]
+data_test = df_final.loc[df_forecast.index[0] :]
 
 # Plot train-test
 fig,ax = plt.subplots()
@@ -299,8 +319,8 @@ pred_curtailment['Real'] = ytest
 # Regression plot
 sns.scatterplot(data= pred_curtailment, x='Real', y= 'Prediction')
 plt.plot(ytest, ytest, color = "red", linewidth= 1) 
-plt.xlabel("Real Power (MW)", alpha= 0.75, weight= "bold")
-plt.ylabel("Predicted Power (MW)", alpha= 0.75, weight= "bold")
+plt.xlabel("Real Power (kW)", alpha= 0.75, weight= "bold")
+plt.ylabel("Predicted Power (kW)", alpha= 0.75, weight= "bold")
 plt.xticks(alpha= 0.75, weight= "bold")
 plt.yticks(alpha= 0.75, weight= "bold")
 plt.title("Correlation real vs predictions for wind curtailment", alpha= 0.75, weight= "bold", pad= 10, loc= "left")
@@ -312,7 +332,7 @@ sns.lineplot(x= pred_curtailment.index, y= pred_curtailment.Real, label= "Real",
 sns.lineplot(x= pred_curtailment.index, y= pred_curtailment.Prediction, label= "Predicted", ax= ax, linewidth = 0.5)
 plt.gca().xaxis.set_major_formatter(date_format)
 plt.xlabel("Date", alpha= 0.75, weight= "bold")
-plt.ylabel("Power (MW)", alpha= 0.75, weight= "bold")
+plt.ylabel("Power (kW)", alpha= 0.75, weight= "bold")
 plt.xticks(alpha= 0.75, weight= "bold", rotation= 45)
 plt.yticks(alpha= 0.75, weight= "bold")
 plt.legend(loc= 'upper left')
@@ -332,5 +352,5 @@ print('R square (%):', round(R2,2))
 
 'Converting predictions into 0 and 1'
 vehicles= 500
-pred_curtailment[var] = np.where(pred_curtailment['Prediction'] > (0.5 * vehicles * 0.0037), 1, 0)
+pred_curtailment[var] = np.where(pred_curtailment['Prediction'] > (0.5 * vehicles * 3700), 1, 0)
 pred_curtailment[var] = np.where((pred_curtailment.index.hour > 6) | (pred_curtailment.index.hour < 0), 0, pred_curtailment[var])

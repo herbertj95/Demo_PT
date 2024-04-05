@@ -109,6 +109,7 @@ Args:
     data - dataframe containing the curtailed power and weather data (including training and test)
     var - name of the variable to forecast
     start_forecast - start of the forecast timestamp
+    power_charger - power of the charger in W
     
 Returns:
     pred_curtailment - dataframe containing the wind curtailment service predictions 

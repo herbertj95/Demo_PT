@@ -45,8 +45,8 @@ lat = 38.954341
 lon = -8.9873593
 print(f'Latitude and longitude of the location: {lat}, {lon}')
 
-# Define the power charger (in W)
-power_charger = 11000
+# Define the power charger for wind curtailment service (in W)
+power_charger = 7400
 
 ###############################################################################################################################
 'Getting historical and forecast weather data from OpenMeteo'

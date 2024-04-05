@@ -178,7 +178,7 @@ def forecasting(data, var, start_forecast):
     
     # Predictions and post-processing
     pred_congestion = pd.DataFrame(reg_RF.predict(xtest), columns= [var], index= xtest.index)
-    pred_congestion['congestion_consumption'] = np.where(pred_congestion[var] > 0.3, 1, 0)
+    pred_congestion['congestion_consumption'] = np.where(pred_congestion[var] > 300, 1, 0)
     pred_congestion['congestion_generation'] = np.where((pred_congestion.index.hour > 12) & (pred_congestion.index.hour < 20) & (pred_congestion[var] < 0.175), 1, 0)
     pred_congestion.drop(var, axis=1, inplace= True)
 

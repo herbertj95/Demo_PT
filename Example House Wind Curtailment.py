@@ -125,6 +125,9 @@ days_past_weather = 7
 lat = 38.954341
 lon = -8.9873593
 
+# Define the power charger (in W)
+power_charger = 7400
+
 ###############################################################################################################################
 'Getting the weather forecasts for next_hours from OpenWeather API'
 ###############################################################################################################################
@@ -290,7 +293,7 @@ plt.fill_between(data_train.index, coloring, facecolor= "darkcyan", alpha= 0.2)
 plt.plot(data_test.index, data_test[var], color = "dodgerblue", alpha= 0.60)
 plt.fill_between(data_test.index, coloring, facecolor= "dodgerblue", alpha= 0.2)
 plt.xlabel("Date", alpha= 0.75, weight= "bold")
-plt.ylabel("Power (MW)", alpha= 0.75, weight= "bold")
+plt.ylabel("Power (W)", alpha= 0.75, weight= "bold")
 plt.xticks(alpha= 0.75,weight= "bold", rotation= 45)
 plt.yticks(alpha= 0.75,weight= "bold")
 plt.title(" Train - Test split for wind curtailment", alpha= 0.75, weight= "bold", pad= 10, loc= "left")
@@ -319,8 +322,8 @@ pred_curtailment['Real'] = ytest
 # Regression plot
 sns.scatterplot(data= pred_curtailment, x='Real', y= 'Prediction')
 plt.plot(ytest, ytest, color = "red", linewidth= 1) 
-plt.xlabel("Real Power (kW)", alpha= 0.75, weight= "bold")
-plt.ylabel("Predicted Power (kW)", alpha= 0.75, weight= "bold")
+plt.xlabel("Real Power (W)", alpha= 0.75, weight= "bold")
+plt.ylabel("Predicted Power (W)", alpha= 0.75, weight= "bold")
 plt.xticks(alpha= 0.75, weight= "bold")
 plt.yticks(alpha= 0.75, weight= "bold")
 plt.title("Correlation real vs predictions for wind curtailment", alpha= 0.75, weight= "bold", pad= 10, loc= "left")
@@ -332,7 +335,7 @@ sns.lineplot(x= pred_curtailment.index, y= pred_curtailment.Real, label= "Real",
 sns.lineplot(x= pred_curtailment.index, y= pred_curtailment.Prediction, label= "Predicted", ax= ax, linewidth = 0.5)
 plt.gca().xaxis.set_major_formatter(date_format)
 plt.xlabel("Date", alpha= 0.75, weight= "bold")
-plt.ylabel("Power (kW)", alpha= 0.75, weight= "bold")
+plt.ylabel("Power (W)", alpha= 0.75, weight= "bold")
 plt.xticks(alpha= 0.75, weight= "bold", rotation= 45)
 plt.yticks(alpha= 0.75, weight= "bold")
 plt.legend(loc= 'upper left')
@@ -352,5 +355,5 @@ print('R square (%):', round(R2,2))
 
 'Converting predictions into 0 and 1'
 vehicles= 500
-pred_curtailment[var] = np.where(pred_curtailment['Prediction'] > (0.5 * vehicles * 3700), 1, 0)
+pred_curtailment[var] = np.where(pred_curtailment['Prediction'] > (0.5 * vehicles * power_charger), 1, 0)
 pred_curtailment[var] = np.where((pred_curtailment.index.hour > 6) | (pred_curtailment.index.hour < 0), 0, pred_curtailment[var])
